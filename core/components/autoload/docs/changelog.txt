@@ -1,0 +1,4 @@
+Changelog for autoload.
+
+2.0.0-pl
+==============
