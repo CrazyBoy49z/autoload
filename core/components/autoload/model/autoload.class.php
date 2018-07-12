@@ -12,32 +12,40 @@ class Autoload
         if (!file_exists($file))
             $this->events = self::update();
         else
-            $this->events = json_decode(file_get_contents($file));
+            $this->events = json_decode(file_get_contents($file), true);
     }
 
 //**************************************************************************************************************************************************
     private static function dir2events($dir, $vendor, &$events, &$plugins)
     {
+        global $modx;
         $files = scandir($dir);
         foreach ($files as $file) {
             if (is_dir($dir . $file) && file_exists($dir . $file . '/plugins.json')) {
-                $data = json_decode(file_get_contents($dir . $file . '/plugins.json'));
-                foreach ($data as $k => $v) {
-                    $events = $v['events'];
-                    $events = explode(',', $events);
-                    foreach ($events as $event) {
-                        $priority = (string)$v['priority'];
-                        $method = $v['method'];
-                        $key = $priority . '.' . $vendor . '.' . $file . '.' . $k;
+                $packagePlugins = json_decode(file_get_contents($dir . $file . '/plugins.json'), true);
+                foreach ($packagePlugins as $k => $v) {
+                    $packageEvents = $v['events'];
+                    if (!empty($packageEvents)) {
+                        $packageEvents = explode(',', $packageEvents);
+                        foreach ($packageEvents as $event) {
+                            $priority = (string)$v['priority'];
+                            $method = $v['method'];
+                            $key = $priority . '.' . $vendor . '.' . $file . '.' . $k;
 
-                        if (!is_array($plugins[$key]))
-                            $plugins[$key] = [];
-                        $plugins[$key][$event] = $method;
+                            if (!isset($plugins[$key]))
+                                $plugins[$key] = [];
+                            $plugins[$key][$event] = $method;
 
 
-                        if (!is_array($events[$event]))
-                            $events[$event] = [];
-                        $events[$event][$key] = $method;
+                            if (!isset($events[$event]))
+                                $events[$event] = [];
+                            $events[$event][$key] = $method;
+                        }
+                    }
+                    else {
+                        $modx->log(1, "Empty property 'events'");
+                        $modx->log(1, "File: " . $dir . $file . '/plugins.json');
+                        $modx->log(1, "Node " . $k);
                     }
                 }
             }
@@ -52,16 +60,22 @@ class Autoload
         $events = [];
         $plugins = [];
 
-        unlink(MODX_CORE_PATH.'_events_flip.json');
-        unlink(MODX_CORE_PATH.'events.json');
+        $fileEvents = MODX_CORE_PATH.'events.json';
+        $filePlugins = MODX_CORE_PATH.'plugins.json';
+        if (file_exists($fileEvents))
+            unlink($fileEvents);
+        if (file_exists($filePlugins))
+            unlink($filePlugins);
 
         self::dir2events(MODX_CORE_PATH.'components/', 'components', $events, $plugins);
 
         $dir = MODX_CORE_PATH.'vendor/';
-        $files = scandir($dir);
-        foreach ($files as $file) {
-            if (is_dir($dir . $file)){
-                self::dir2events($dir . $file, $file, $events, $plugins);
+        if (file_exists($dir)) {
+            $files = scandir($dir);
+            foreach ($files as $file) {
+                if (is_dir($dir . $file)) {
+                    self::dir2events($dir . $file, $file, $events, $plugins);
+                }
             }
         }
 
@@ -69,28 +83,35 @@ class Autoload
             ksort($event);
         }
 
-        $obj = $modx->getObject('modPlugin',  ['name' => 'autoload.routeEvent']);
+        file_put_contents($fileEvents, json_encode($events));
+        $modx->log(2, "File created successfully: " . $fileEvents);
+        file_put_contents($filePlugins, json_encode($plugins));
+        $modx->log(2, "File created successfully: " . $filePlugins);
+
+        $obj = $modx->getObject('modPlugin',  ['name' => 'gjpbw_routeEvent']);
         $id = $obj->id;
         $collection = $modx->getCollection('modPluginEvent',  ['pluginid' => $id]);
         foreach ($collection as $obj) {
             $event = $obj->get('event');
-            if (!array_key_exists($event, $events) && $event !== 'OnMODXInit')
+            if (!array_key_exists($event, $events) && $event !== 'OnMODXInit') {
                 $obj->remove();
-            else
+                $modx->log(2, "Remove event: " . $event);
+            } else
                 unset($events[$event]);
+        }
 
-        foreach ($events as $event){
+        foreach ($events as $event => $v){
             if ($event !== 'OnMODXInit') {
-                $obj = $modx->newObject('modPluginEvent', ['pluginid' => $id, 'event' => $event]);
+                $obj = $modx->newObject('modPluginEvent');
+                $obj->pluginid = $id;
+                $obj->event = $event;
+                $obj->priority = 50;
                 $obj->save();
+                $modx->log(2, "Create event: " . $event);
             }
         }
 
-    }
-
-        file_put_contents(MODX_CORE_PATH.'_events_flip.json', json_encode($plugins));
-        file_put_contents(MODX_CORE_PATH.'events.json', json_encode($events));
-        return $events;
+         return $events;
      }
 //**************************************************************************************************************************************************
         public static function startPage()
@@ -128,31 +149,29 @@ class Autoload
     {
         global $modx;	//не убирать, используется в include $file;
 
-        switch ($eventName) {
-            case 'OnMODXInit':
-                define('MODX_ELEMENTS_PATH', MODX_CORE_PATH.'elements/');
-                define('MODX_EXT_FOLDER', 'core/ext/');
-                define('MODX_EXT_PATH', MODX_CORE_PATH.'ext/');
+        if ($eventName == 'OnMODXInit') {
+            define('MODX_ELEMENTS_PATH', MODX_CORE_PATH.'elements/');
+            define('MODX_EXT_FOLDER', 'core/ext/');
+            define('MODX_EXT_PATH', MODX_CORE_PATH.'ext/');
 
 
-                spl_autoload_register(function ($class) {
-                    if ((strpos($class, '/')) == false) { // что бы не подсунули '../'
-                        $name = strtolower($class);
-                        $filename = strtolower(MODX_CORE_PATH . 'components/' . $name . '/model/' . $name . '.class.php');
+            spl_autoload_register(function ($class) {
+                if ((strpos($class, '/')) == false) { // что бы не подсунули '../'
+                    $name = strtolower($class);
+                    $filename = strtolower(MODX_CORE_PATH . 'components/' . $name . '/model/' . $name . '.class.php');
+                    if (file_exists($filename))
+                        include_once($filename);
+                    else {
+                        $filename = strtolower(MODX_ELEMENTS_PATH . 'class/' . $name . '.class.php');
                         if (file_exists($filename))
                             include_once($filename);
-                        else {
-                            $filename = strtolower(MODX_ELEMENTS_PATH . 'class/' . $name . '.class.php');
-                            if (file_exists($filename))
-                                include_once($filename);
-                        }
                     }
-                });
+                }
+            });
 
-                self::includeFile(MODX_CORE_PATH . 'vendor/autoload.php');
-
-                break;
+            self::includeFile(MODX_CORE_PATH . 'vendor/autoload.php');
         }
+
         if (!empty($this->events[$eventName]))
         foreach ($this->events[$eventName] as $event){
             $method = trim($event['method']);
@@ -163,7 +182,7 @@ class Autoload
                 $modx->runSnippet(substr($event,2 , -2));
         }
 
-        //self::includeFiles(MODX_ELEMENTS_PATH . 'plugins/' . $eventName . '/*.php');
+        self::includeFile(MODX_ELEMENTS_PATH . 'plugins/' . $eventName . '.php');
     }
 //**************************************************************************************************************************************************
     private static function includePlaceholders($dir){

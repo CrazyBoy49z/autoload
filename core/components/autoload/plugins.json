@@ -1,6 +1,6 @@
 {
   "startPage": {
-    "event": "OnLoadWebDocument",
+    "events": "OnLoadWebDocument",
     "priority": "50",
     "method": "Autoload::startPage"
   }

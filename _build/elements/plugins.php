@@ -8,8 +8,8 @@ return [
             'OnBeforeCacheUpdate' => []
         ],
     ],
-    'autoload.routeEvent' => [
-        'file' => 'routeEvent',
+    'gjpbw_routeEvent' => [
+        'file' => 'gjpbw_routeEvent',
         'description' => '',
         'events' => [
             'OnMODXInit' => []
