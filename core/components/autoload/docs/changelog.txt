@@ -1,4 +1,4 @@
 Changelog for autoload.
 
-2.0.0-pl
+1.0.0
 ==============

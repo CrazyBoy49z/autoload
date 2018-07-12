@@ -1,16 +1,18 @@
 <?php
 
 return [
-    'autoload' => [
-        'file' => 'autoload',
+    'update' => [
+        'file' => 'update',
         'description' => '',
         'events' => [
-            'OnMODXInit' => [],
-            'OnHandleRequest' => [],
-            'OnWebPageInit' => [],
-            'OnLoadWebDocument' => [],
-            'OnWebPagePrerender' => [],
-            'OnWebPageComplete' => [],
+            'OnBeforeCacheUpdate' => []
+        ],
+    ],
+    'autoload.routeEvent' => [
+        'file' => 'routeEvent',
+        'description' => '',
+        'events' => [
+            'OnMODXInit' => []
         ],
     ],
 ];

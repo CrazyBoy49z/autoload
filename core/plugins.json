@@ -1,0 +1,7 @@
+{
+  "startPage": {
+    "event": "OnLoadWebDocument",
+    "priority": "50",
+    "method": "Autoload::startPage"
+  }
+}
