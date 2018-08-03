@@ -16,106 +16,25 @@ class Autoload
     }
 
 //**************************************************************************************************************************************************
-    private static function dir2events($dir, $vendor, &$events, &$plugins)
-    {
-        global $modx;
-        $files = scandir($dir);
-        foreach ($files as $file) {
-            if (is_dir($dir . $file) && file_exists($dir . $file . '/plugins.json')) {
-                $packagePlugins = json_decode(file_get_contents($dir . $file . '/plugins.json'), true);
-                foreach ($packagePlugins as $k => $v) {
-                    $packageEvents = $v['events'];
-                    if (!empty($packageEvents)) {
-                        $packageEvents = explode(',', $packageEvents);
-                        foreach ($packageEvents as $event) {
-                            $priority = (string)$v['priority'];
-                            $method = $v['method'];
-                            $key = $priority . '.' . $vendor . '.' . $file . '.' . $k;
-
-                            if (!isset($plugins[$key]))
-                                $plugins[$key] = [];
-                            $plugins[$key][$event] = $method;
-
-
-                            if (!isset($events[$event]))
-                                $events[$event] = [];
-                            $events[$event][$key] = $method;
-                        }
-                    }
-                    else {
-                        $modx->log(1, "Empty property 'events'");
-                        $modx->log(1, "File: " . $dir . $file . '/plugins.json');
-                        $modx->log(1, "Node " . $k);
-                    }
-                }
-            }
-        }
-    }
-
-//**************************************************************************************************************************************************
     public static function update()
     {
         global $modx;
+        $t = $modx->getLogTarget(); //метод $modx->runProcessor портит LogTarget и LogLevel
+        $l = $modx->getLogLevel();
 
-        $events = [];
-        $plugins = [];
+        include_once(__DIR__ . '/AutoloadModxHook.php');
+        $modxHook = new AutoloadModxHook($modx);
+        $output =  $modxHook->update();
 
-        $fileEvents = MODX_CORE_PATH.'events.json';
-        $filePlugins = MODX_CORE_PATH.'plugins.json';
-        if (file_exists($fileEvents))
-            unlink($fileEvents);
-        if (file_exists($filePlugins))
-            unlink($filePlugins);
+        $modx->setLogTarget($t);
+        $modx->setLogLevel($l);
 
-        self::dir2events(MODX_CORE_PATH.'components/', 'components', $events, $plugins);
-
-        $dir = MODX_CORE_PATH.'vendor/';
-        if (file_exists($dir)) {
-            $files = scandir($dir);
-            foreach ($files as $file) {
-                if (is_dir($dir . $file)) {
-                    self::dir2events($dir . $file, $file, $events, $plugins);
-                }
-            }
-        }
-
-        foreach ($events as $event) {
-            ksort($event);
-        }
-
-        file_put_contents($fileEvents, json_encode($events));
-        $modx->log(2, "File created successfully: " . $fileEvents);
-        file_put_contents($filePlugins, json_encode($plugins));
-        $modx->log(2, "File created successfully: " . $filePlugins);
-
-        $obj = $modx->getObject('modPlugin',  ['name' => 'gjpbw_routeEvent']);
-        $id = $obj->id;
-        $collection = $modx->getCollection('modPluginEvent',  ['pluginid' => $id]);
-        foreach ($collection as $obj) {
-            $event = $obj->get('event');
-            if (!array_key_exists($event, $events) && $event !== 'OnMODXInit') {
-                $obj->remove();
-                $modx->log(2, "Remove event: " . $event);
-            } else
-                unset($events[$event]);
-        }
-
-        foreach ($events as $event => $v){
-            if ($event !== 'OnMODXInit') {
-                $obj = $modx->newObject('modPluginEvent');
-                $obj->pluginid = $id;
-                $obj->event = $event;
-                $obj->priority = 50;
-                $obj->save();
-                $modx->log(2, "Create event: " . $event);
-            }
-        }
-
-         return $events;
-     }
+        $modx->log(3, $output);
+        return $output;
+    }
 //**************************************************************************************************************************************************
-        public static function startPage()
-    {
+    public static function startPage()
+        {
         global $modx;
         $pageFolder = $modx->context->get('key') . '/' . trim($modx->resource->uri, '/') . '/';
         define('MODX_PAGE_FOLDER', $pageFolder);
@@ -154,7 +73,6 @@ class Autoload
             define('MODX_EXT_FOLDER', 'core/ext/');
             define('MODX_EXT_PATH', MODX_CORE_PATH.'ext/');
 
-
             spl_autoload_register(function ($class) {
                 if ((strpos($class, '/')) == false) { // что бы не подсунули '../'
                     $name = strtolower($class);
@@ -174,7 +92,7 @@ class Autoload
 
         if (!empty($this->events[$eventName]))
         foreach ($this->events[$eventName] as $event){
-            $method = trim($event['method']);
+            $method = trim($event);
             $a = explode('::', $method);
             if (is_array($a) && count($a) == 2)
                 eval ($method .  '();');
