@@ -11,8 +11,8 @@ if (!defined('MODX_CORE_PATH')) {
 return [
     'name' => 'autoload',
     'name_lower' => 'autoload',
-    'version' => '2.0.0',
-    'release' => 'pl',
+    'version' => '2.1.0',
+    'release' => 'beta',
     // Install package to site right after build
     'install' => true,
     // Which elements should be updated on package upgrade

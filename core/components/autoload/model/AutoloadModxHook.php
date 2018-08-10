@@ -176,6 +176,7 @@ class AutoloadModxHook
 //**************************************************************************************************************************************************
     private function install($dir, $namespace)
     {
+        $modx = $this->modx;    //не убирать, используется в include
         $properties = json_decode(file_get_contents($dir . '/modx.json'), true);
 
         $data = ['name' => $namespace];
@@ -244,10 +245,6 @@ class AutoloadModxHook
                     }
                 }
             }
-        }
-        $file = $dir . 'install.php';
-        if (file_exists($file)) {
-            include $file;
         }
 
         $file = $dir . 'mysql.schema.xml';
@@ -349,6 +346,10 @@ class AutoloadModxHook
             }
         }
 
+        $file = $dir . 'install.php';
+        if (file_exists($file)) {
+            include $file;
+        }
 
         $destDir = MODX_CORE_PATH.'elements/etc/autoload/uninstall/' . $namespace;
 
@@ -364,6 +365,7 @@ class AutoloadModxHook
 //**************************************************************************************************************************************************
     private  function uninstall($dir, $namespace)
     {
+        $modx = $this->modx;    //не убирать, используется в include
         $properties = json_decode(file_get_contents($dir . 'modx.json'), true);
 
         if (!empty($properties['category'])) {
